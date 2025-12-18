@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useCarsDatabase } from '../hooks/useCarsDatabase';
 
 export interface Car {
   id: number;
+  /** optional database id when persisted in Supabase (uuid or string) */
+  dbId?: string;
   brand: string;
   model: string;
   year: number;
@@ -1236,13 +1239,144 @@ const initialCars: Car[] = [
 ];
 
 export const CarsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [cars, setCars] = useState<Car[]>(() => initialCars);
+  const db = useCarsDatabase();
+  // load from localStorage when Supabase isn't configured so admin changes persist between provider instances
+  const localKey = 'll_cars_v1';
+  const isSupabaseConfigured = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    return !!url && !!key && url !== 'https://placeholder.supabase.co' && key !== 'placeholder-key';
+  };
+
+  const [cars, setCars] = useState<Car[]>(() => {
+    try {
+      if (!isSupabaseConfigured()) {
+        const raw = localStorage.getItem(localKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Car[];
+          return parsed;
+        }
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+    return initialCars;
+  });
+
+  // (isSupabaseConfigured defined above for initializer)
+
+  // Map a DB row to our Car shape
+  const mapDbRowToCar = (row: any, index: number): Car => {
+    // ensure numeric local id while keeping db id
+    const localId = Math.floor(Date.now() / 1000) + index;
+    return {
+      id: localId,
+      dbId: row.id,
+      brand: row.brand,
+      model: row.model,
+      year: row.year,
+      price: row.price || 0,
+      status: row.status || 'available',
+      views: row.views || 0,
+      inquiries: row.inquiries || 0,
+      images: row.images || [],
+      mainImageIndex: row.main_image_index ?? 0,
+      fuel: row.fuel || '',
+      transmission: row.transmission || '',
+      mileage: row.mileage || '',
+      rating: row.rating || 4.0,
+      features: row.features || [],
+      description: row.description || '',
+      warranty: row.warranty || '',
+      inspection: row.inspection || '',
+      financing: row.financing || false,
+      exchange: row.exchange || false,
+      maintenance: row.maintenance || false,
+      support247: row.support247 || false,
+      createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || new Date().toISOString()
+    };
+  };
+
+  // When Supabase is configured, load cars from DB on mount
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!isSupabaseConfigured()) return;
+      try {
+        await db.fetchCars();
+        if (!mounted) return;
+        if (db.cars && db.cars.length > 0) {
+          const mapped = db.cars.map((r, i) => mapDbRowToCar(r, i));
+          setCars(mapped);
+        }
+      } catch (err) {
+        console.warn('Error loading cars from DB', err);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    // لم نعد نخزن في localStorage
+    // keep in-memory state in sync with db.cars when db provides updates
+    if (!isSupabaseConfigured()) return;
+    if (db.cars && db.cars.length > 0) {
+      const mapped = db.cars.map((r, i) => mapDbRowToCar(r, i));
+      setCars(mapped);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db.cars]);
+
+  // persist to localStorage when Supabase not configured
+  useEffect(() => {
+    try {
+      if (!isSupabaseConfigured()) {
+        localStorage.setItem(localKey, JSON.stringify(cars));
+      }
+    } catch (err) {
+      // ignore storage errors
+    }
   }, [cars]);
 
-  const addCar = (carData: Omit<Car, 'id' | 'views' | 'inquiries' | 'createdAt' | 'updatedAt'>) => {
+  const addCar = async (carData: Omit<Car, 'id' | 'views' | 'inquiries' | 'createdAt' | 'updatedAt'>) => {
+    if (isSupabaseConfigured() && db.addCar) {
+      // prepare payload for DB (snake_case fields)
+      const payload: any = {
+        brand: carData.brand,
+        model: carData.model,
+        year: carData.year,
+        price: carData.price,
+        status: carData.status,
+        views: 0,
+        inquiries: 0,
+        images: carData.images || [],
+        main_image_index: carData.mainImageIndex || 0,
+        fuel: carData.fuel,
+        transmission: carData.transmission,
+        mileage: carData.mileage,
+        rating: carData.rating,
+        features: carData.features || [],
+        description: carData.description || '',
+        warranty: carData.warranty || '',
+        inspection: carData.inspection || '',
+        financing: carData.financing || false,
+        exchange: carData.exchange || false,
+        maintenance: carData.maintenance || false,
+        support247: carData.support247 || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const created = await db.addCar(payload).catch(err => { console.warn(err); return null; });
+      if (created) {
+        const mapped = mapDbRowToCar(created, 0);
+        setCars(prev => [mapped, ...prev]);
+        return mapped;
+      }
+      // fallback to in-memory
+    }
+
     const newCar: Car = {
       ...carData,
       id: Math.max(...cars.map(c => c.id), 0) + 1,
@@ -1255,16 +1389,38 @@ export const CarsProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return newCar;
   };
 
-  const updateCar = (id: number, carData: Partial<Car>) => {
-    setCars(prev => prev.map(car => 
-      car.id === id 
-        ? { ...car, ...carData, updatedAt: new Date().toISOString() }
-        : car
-    ));
+  const updateCar = async (id: number, carData: Partial<Car>) => {
+    const existing = cars.find(c => c.id === id);
+    if (!existing) return undefined;
+    if (isSupabaseConfigured() && existing.dbId && db.updateCar) {
+      const payload: any = {
+        ...carData,
+        main_image_index: carData.mainImageIndex,
+        updated_at: new Date().toISOString()
+      };
+      // remove local-only fields
+      delete payload.id;
+      delete payload.dbId;
+      const updated = await db.updateCar(existing.dbId, payload).catch(err => { console.warn(err); return null; });
+      if (updated) {
+        const mapped = mapDbRowToCar(updated, 0);
+        setCars(prev => prev.map(c => c.id === id ? { ...mapped, id } : c));
+        return mapped;
+      }
+    }
+
+    setCars(prev => prev.map(car => car.id === id ? { ...car, ...carData, updatedAt: new Date().toISOString() } : car));
     return cars.find(car => car.id === id);
   };
 
-  const deleteCar = (id: number) => {
+  const deleteCar = async (id: number) => {
+    const existing = cars.find(c => c.id === id);
+    if (!existing) return;
+    if (isSupabaseConfigured() && existing.dbId && db.deleteCar) {
+      await db.deleteCar(existing.dbId).catch(err => { console.warn(err); });
+      setCars(prev => prev.filter(c => c.id !== id));
+      return;
+    }
     setCars(prev => prev.filter(car => car.id !== id));
   };
 
@@ -1276,20 +1432,26 @@ export const CarsProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return cars.filter(car => car.status === 'available');
   };
 
-  const incrementViews = (id: number) => {
-    setCars(prev => prev.map(car => 
-      car.id === id 
-        ? { ...car, views: car.views + 1, updatedAt: new Date().toISOString() }
-        : car
-    ));
+  const incrementViews = async (id: number) => {
+    const existing = cars.find(c => c.id === id);
+    if (!existing) return;
+    if (isSupabaseConfigured() && existing.dbId && db.incrementViews) {
+      await db.incrementViews(existing.dbId).catch(err => { console.warn(err); });
+      setCars(prev => prev.map(c => c.id === id ? { ...c, views: c.views + 1, updatedAt: new Date().toISOString() } : c));
+      return;
+    }
+    setCars(prev => prev.map(car => car.id === id ? { ...car, views: car.views + 1, updatedAt: new Date().toISOString() } : car));
   };
 
-  const incrementInquiries = (id: number) => {
-    setCars(prev => prev.map(car => 
-      car.id === id 
-        ? { ...car, inquiries: car.inquiries + 1, updatedAt: new Date().toISOString() }
-        : car
-    ));
+  const incrementInquiries = async (id: number) => {
+    const existing = cars.find(c => c.id === id);
+    if (!existing) return;
+    if (isSupabaseConfigured() && existing.dbId && db.incrementInquiries) {
+      await db.incrementInquiries(existing.dbId).catch(err => { console.warn(err); });
+      setCars(prev => prev.map(c => c.id === id ? { ...c, inquiries: c.inquiries + 1, updatedAt: new Date().toISOString() } : c));
+      return;
+    }
+    setCars(prev => prev.map(car => car.id === id ? { ...car, inquiries: car.inquiries + 1, updatedAt: new Date().toISOString() } : car));
   };
 
   const searchCars = (query: string) => {

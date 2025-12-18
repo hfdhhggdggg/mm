@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { 
   Plus, 
   Edit, 
@@ -128,19 +129,41 @@ const CarManagement = () => {
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const imageUrl = e.target?.result as string;
-          setFormData(prev => ({
-            ...prev,
-            images: [...prev.images, imageUrl]
-          }));
-        };
-        reader.readAsDataURL(file);
-      });
-    }
+    if (!files) return;
+
+    Array.from(files).forEach(async (file) => {
+      // If Supabase is configured, attempt upload to storage bucket 'car-images'
+      try {
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const useSupabase = url && key && url !== 'https://placeholder.supabase.co' && key !== 'placeholder-key';
+
+        if (useSupabase) {
+          const fileExt = (file.name.split('.').pop() || 'jpg').replace(/[^a-zA-Z0-9]/g, '');
+          const fileName = `cars/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+          const { data, error } = await supabase.storage.from('car-images').upload(fileName, file as File, { upsert: false });
+          if (error) throw error;
+          const { data: urlData, error: urlErr } = supabase.storage.from('car-images').getPublicUrl(fileName);
+          if (urlErr) throw urlErr;
+          const publicUrl = urlData.publicUrl;
+          setFormData(prev => ({ ...prev, images: [...prev.images, publicUrl] }));
+          return;
+        }
+      } catch (err) {
+        console.warn('Image upload to Supabase failed, falling back to Data URL:', err);
+      }
+
+      // Fallback: read as data URL for immediate preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageUrl = e.target?.result as string;
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, imageUrl]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const removeImage = (index: number) => {
