@@ -1,0 +1,275 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* User requested no visible red: map red variables to the brand blue values so
+     all existing CSS that references --brand-red becomes blue immediately. */
+  --brand-red: #005ba4; /* mapped to brand blue */
+  --brand-red-700: #003f73; /* darker blue for hover/700 variants */
+  --brand-blue: #005ba4;
+  --brand-white: #ffffff;
+}
+
+/* Arabic Font Configuration */
+* {
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* RTL Support Enhancements */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Custom Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-fadeInRight {
+  animation: fadeInRight 0.6s ease-out;
+}
+
+.animate-fadeInLeft {
+  animation: fadeInLeft 0.6s ease-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--brand-red);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-red-700);
+}
+
+/* Selection Color */
+::selection {
+  background-color: var(--brand-red);
+  color: var(--brand-white);
+}
+
+/* Focus Styles */
+button:focus,
+a:focus {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 2px;
+}
+
+/* Loading Animation */
+.loading-spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--brand-red);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Typography */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.5rem;
+    line-height: 1.2;
+  }
+  
+  h2 {
+    font-size: 2rem;
+    line-height: 1.2;
+  }
+  
+  h3 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+  }
+}
+
+/* Card Hover Effects */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Button Animations */
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-700) 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(176, 20, 25, 0.28);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-700) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Arabic Text Improvements */
+.arabic-text {
+  font-weight: 400;
+  line-height: 1.8;
+  letter-spacing: 0.5px;
+}
+
+.arabic-title {
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* Image Optimizations */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.object-cover {
+  object-fit: cover;
+}
+
+/* Container Improvements */
+.container {
+  max-width: 1200px;
+}
+
+/* Accessibility Improvements */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  /* Add dark mode styles if needed */
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .btn-primary {
+    border: 2px solid #000;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Utility overrides: force Tailwind utility classes to use the brand colors
+   This helps when dev server or cache prevents immediate regeneration of
+   Tailwind CSS. These are intentionally specific and use !important so
+   they take precedence over generated utilities. */
+.bg-red-600 { background-color: var(--brand-red) !important; }
+.hover\:bg-red-600:hover { background-color: var(--brand-red) !important; }
+.bg-red-700 { background-color: var(--brand-red-700) !important; }
+.hover\:bg-red-700:hover { background-color: var(--brand-red-700) !important; }
+.text-red-600 { color: var(--brand-red) !important; }
+.hover\:text-red-600:hover { color: var(--brand-red) !important; }
+.border-red-600 { border-color: var(--brand-red) !important; }
+.stroke-red-600 { stroke: var(--brand-red) !important; }
+.fill-red-600 { fill: var(--brand-red) !important; }
+
+.bg-blue-600 { background-color: var(--brand-blue) !important; }
+.hover\:bg-blue-600:hover { background-color: var(--brand-blue) !important; }
+.text-blue-600 { color: var(--brand-blue) !important; }
+.hover\:text-blue-600:hover { color: var(--brand-blue) !important; }
+.border-blue-600 { border-color: var(--brand-blue) !important; }
+
+/* A few convenience aliases used in the codebase */
+.btn-primary, .bg-brand-red { background-color: var(--brand-red) !important; color: var(--brand-white) !important; }
+.btn-primary:hover { background-color: var(--brand-red-700) !important; }
+
+
+/* Immediate brand overrides for Tailwind utility classes
+   These ensure existing classes like `bg-red-600` and `text-blue-600`
+   reflect the requested brand colors even if the dev server needs a restart.
+*/
+.bg-red-600 { background-color: var(--brand-red) !important; }
+.text-red-600 { color: var(--brand-red) !important; }
+.hover\:text-red-600:hover { color: var(--brand-red) !important; }
+.hover\:bg-red-700:hover { background-color: var(--brand-red-700) !important; }
+.bg-blue-600 { background-color: var(--brand-blue) !important; }
+.text-blue-600 { color: var(--brand-blue) !important; }
+.hover\:text-blue-600:hover { color: var(--brand-blue) !important; }
+
+/* Ensure buttons using bg-red-600 keep contrast */
+.bg-red-600.text-white { color: var(--brand-white) !important; }
